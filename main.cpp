@@ -1,143 +1,36 @@
-1#include <iostream>
+#include <iostream>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
 using namespace std;
+typedef unsigned int uint;
 const int N = 34;
 const int M = 2e5;
 const int K = 10;
-int pc, npc, op, op_, op__, rd;
-int sh, Rs2, tr[200];
+uint pc, npc, op, op_, op__, rd;
+uint sh, Rs2, tr[200];
 bool con;
 
-struct data{
-	int a[N];
+uint mem[M], reg[N], cur, imm, ALUOutput, lmd, rs1, rs2;
 
-	void extend(bool iss, int len){
-		if (iss && a[len])
-			for (int i = 31; i > len; i--)
-				a[i] = 1;
-		else
-			for (int i = 31; i > len; i--)
-				a[i] = 0;
-	}
+void extend(uint &x, int p){
+	if ((x >> p) & 1)
+		for (int i = 31; i > p; i--)
+			x |= (1u << i);
+}
 
-	bool operator ==(const data &b){
-		for (int i = 0; i < 32; i++)
-			if (a[i] != b.a[i])
-				return 0;
+uint les(uint x, uint y){
+	if (!((x >> 31) & 1) && ((y >> 31) & 1))
+		return 0;
+	if (((x >> 31) & 1) && !((y >> 31) & 1))
 		return 1;
-	}
-
-	data& operator =(const data &b){
-		for (int i = 31; i >= 0; i--)
-			a[i] = b.a[i];
-		return *this;
-	}
-
-	data operator +(const data &b){
-		data s;
-		for (int i = 0; i < 32; i++)
-		//	s.a[i] = 0;
-			s.a[i] = a[i] + b.a[i];
-		for (int i = 0; i < 32; i++){
-			if (s.a[i] >= 2)
-				s.a[i + 1] += 1, s.a[i] -= 2;
-		}
-		return s;
-	}
-
-	data operator -(const data &b){
-		data s;
-		for (int i = 0; i < 32; i++)
-			s.a[i] = b.a[i] ^ 1;
-		s.a[0]++;
-		for (int i = 0; i < 32; i++){
-			if (s.a[i] >= 2)
-				s.a[i + 1] += 1, s.a[i] -= 2;
-		}
-		return *this + s;
-	}
-
-	data operator |(const data &b){
-		data s;
-		for (int i = 0; i < 32; i++)
-			s.a[i] = a[i] | b.a[i];
-		return s;
-	}
-
-	data operator &(const data &b){
-		data s;
-		for (int i = 0; i < 32; i++)
-			s.a[i] = a[i] & b.a[i];
-		return s;
-	}
-
-	data operator ^(const data &b){
-		data s;
-		for (int i = 0; i < 32; i++)
-			s.a[i] = a[i] ^ b.a[i];
-		return s;
-	}
-
-	data sl(int x){
-		data s;
-		for (int i = 31; i >= x; i--)
-			s.a[i] = a[i - x];
-		for (int i = x - 1; i >= 0; i--)
-			s.a[i] = 0;
-		return s;
-	}
-
-	data sr(int x, bool op){
-		data s;
-		for (int i = 31 - x; i >= 0; i--)
-			s.a[i] = a[i + x];
-		for (int i = 31; i >= 32 - x; i--)
-			s.a[i] = (op & a[31]);
-		return s;
-	}
-
-	bool les(const data &b){
-		if (!a[31] && b.a[31])
-			return 0;
-		if (a[31] && !b.a[31])
+	for (int i = 30; i >= 0; i--){
+		if (((x >> i) & 1) < ((y >> i) & 1))
 			return 1;
-		for (int i = 30; i >= 0; i--){
-			if (a[i] < b.a[i])
-				return 1;
-			if (a[i] > b.a[i])
-				return 0;
-		}
-		return 0;
+		if (((x >> i) & 1) > ((y >> i) & 1))
+			return 0;
 	}
-
-	bool lesu(const data &b){
-		for (int i = 31; i >= 0; i--){
-			if (a[i] < b.a[i])
-				return 1;
-			if (a[i] > b.a[i])
-				return 0;
-		}
-		return 0;
-	}
-
-	int calc(){
-		int s = 0;
-		for (int i = 31; i >= 0; i--)
-			s = (s << 1) | a[i];
-		return s;
-	}
-
-}mem[M], reg[N], cur, imm, ALUOutput, lmd, rs1, rs2;
-
-data trans(int x){
-	data s;
-	for (int i = 0; i < 32; i++){
-		s.a[i] = x & 1;
-		x >>= 1;
-	}
-	return s;
+	return 0;
 }
 
 void pre(){
@@ -146,7 +39,7 @@ void pre(){
 	for (int i = 10; i < 16; i++)
 		tr[int('A') + i - 10] = i;
 	char s[10];
-	int x;
+	uint x;
 	while (scanf("%s", s) != EOF){
 		if (s[0] == '@'){
 			x = 0;
@@ -158,13 +51,13 @@ void pre(){
 			x = 0;
 			for (int i = 0; i < 2; i++)
 				x = (x << 4) + tr[s[i]];
-			mem[pc] = trans(x);
+			mem[pc] = x;
 			for (int j = 1; j < 4; j++){
 				scanf("%s", s);
 				x = 0;
 				for (int i = 0; i < 2; i++)
 					x = (x << 4) + tr[s[i]];
-				mem[pc + j] = trans(x);
+				mem[pc + j] = x;
 			}
 			pc += 4;
 		}
@@ -174,148 +67,102 @@ void pre(){
 
 void IF(int id){
 	int len = 32;
+	cur = 0;
 	for (int i = 3; i >= 0; i--)
-		for (int j = 7; j >= 0; j--)
-			cur.a[--len] = mem[pc + i].a[j];
-	npc = pc + 4;
+		cur = (cur << 8) + mem[pc + i];
+	npc = (pc += 4);
+}
+
+uint get(uint x, int l, int r){
+	uint s = 0;
+	for (int i = r; i >= l; i--)
+		s = (s << 1) | ((x >> i) & 1);
+	return s;
 }
 
 void ID(int id){
-	op = 0;
-	for (int i = 6; i >= 0; i--)
-		op = (op << 1) | cur.a[i];
-
-	int x;
+	op = get(cur, 0, 6);
 	switch (op){
 	case 23: case 55: //LUI AUIPC
-		x = 0;
-		for (int i = 11; i > 6; i--)
-			x = (x << 1) | cur.a[i];
-		rd = x;
+		rd = get(cur, 7, 11);
+		imm = 0;
 		for (int i = 31; i > 11; i--)
-			imm.a[i] = cur.a[i];
-		for (int i = 11; i >= 0; i--)
-			imm.a[i] = 0;
+			imm |= (1u << i) * ((cur >> i) & 1);
 		return;
 	
 	case 111: //JAL
-		x = 0;
-		for (int i = 11; i > 6; i--)
-			x = (x << 1) | cur.a[i];
-		rd = x;
-		imm.a[0] = 0;
-		imm.a[20] = cur.a[31];
+		rd = get(cur, 7, 11);
+		imm = 0;
+		imm |= (1 << 20) * ((cur >> 31) & 1);
 		for (int i = 30; i > 20; i--)
-			imm.a[i - 20] = cur.a[i];
-		imm.a[11] = cur.a[20];
+			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
+		imm |= (1 << 11) * ((cur >> 20) & 1);
 		for (int i = 19; i > 11; i--)
-			imm.a[i] = cur.a[i];
-		imm.extend(1, 19);
+			imm |= (1 << i) * ((cur >> i) & 1);
+		extend(imm, 19);
 		return;
 
 	case 103: case 3: //JALR 
-		x = 0;
-		for (int i = 11; i > 6; i--)
-			x = (x << 1) | cur.a[i];
-		rd = x;
-		x = 0;
-		for (int i = 19; i > 14; i--)
-			x = (x << 1) | cur.a[i];
-		rs1 = reg[x];
-		op_ = 0;
-		for (int i = 14; i > 11; i--)
-			op_ = (op_ << 1) | cur.a[i];
+		rd = get(cur, 7, 11);
+		rs1 = reg[get(cur, 15, 19)];
+		op_ = get(cur, 12, 14);
+		imm = 0;
 		for (int i = 31; i > 19; i--)
-			imm.a[i - 20] = cur.a[i];
-		imm.extend(1, 11);
+			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
+		extend(imm, 11);
 		return;
 
 	case 99:
-		x = 0;
-		for (int i = 19; i > 14; i--)
-			x = (x << 1) | cur.a[i];
-		rs1 = reg[x];
-		x = 0;
-		for (int i = 24; i > 19; i--)
-			x = (x << 1) | cur.a[i];
-		Rs2 = x;
-		rs2 = reg[x];
-		op_ = 0;
-		for (int i = 14; i > 11; i--)
-			op_ = (op_ << 1) | cur.a[i];
-		imm.a[0] = 0;
-		imm.a[12] = cur.a[31];
+		rs1 = reg[get(cur, 15, 19)];
+		Rs2 = get(cur, 20, 24);
+		rs2 = reg[Rs2];
+		op_ = get(cur, 12, 14);
+		imm = 0;
+		imm |= (1 << 12) * ((cur >> 31) & 1);
 		for (int i = 30; i > 24; i--)
-			imm.a[i - 20] = cur.a[i];
+			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
 		for (int i = 11; i > 7; i--)
-			imm.a[i - 7] = cur.a[i];
-		imm.a[11] = cur.a[7];
-		imm.extend(1, 11);
+			imm |= (1 << (i - 7)) * ((cur >> i) & 1);
+		imm |= (1 << 11) * ((cur >> 7) & 1);
+		extend(imm, 12);
 		return;
 
 	case 19:
-		x = 0;
-		for (int i = 11; i > 6; i--)
-			x = (x << 1) | cur.a[i];
-		rd = x;
-		x = 0;
-		for (int i = 19; i > 14; i--)
-			x = (x << 1) | cur.a[i];
-		rs1 = reg[x];
-		op_ = 0;
-		for (int i = 14; i > 11; i--)
-			op_ = (op_ << 1) | cur.a[i];
+		rd = get(cur, 7, 11);
+		rs1 = reg[get(cur, 15, 19)];
+		op_ = get(cur, 12, 14);
 		if (op_ == 1 || op_ == 5){
-			sh = 0;
-			for (int i = 25; i > 19; i--)
-				sh = (sh << 1) | cur.a[i];
+			sh = get(cur, 20, 25);
 		}
 		else{
+			imm = 0;
 			for (int i = 31; i > 19; i--)
-				imm.a[i - 20] = cur.a[i];
-			imm.extend(1, 11);
+				imm |= (1 << (i - 20)) * ((cur >> i) & 1);
+			extend(imm, 11);
 		}
-		op__ = cur.a[30];
+		op__ = get(cur, 30, 30);;
 		return;
 
 	case 35:
-		x = 0;
-		for (int i = 19; i > 14; i--)
-			x = (x << 1) | cur.a[i];
-		rs1 = reg[x];
-		x = 0;
-		for (int i = 24; i > 19; i--)
-			x = (x << 1) | cur.a[i];
-		Rs2 = x;
-		rs2 = reg[x];
-		op_ = 0;
-		for (int i = 14; i > 11; i--)
-			op_ = (op_ << 1) | cur.a[i];
+		rs1 = reg[get(cur, 15, 19)];
+		Rs2 = get(cur, 20, 24);
+		rs2 = reg[Rs2];
+		op_ = get(cur, 12, 14);
+		imm = 0;
 		for (int i = 31; i > 24; i--)
-			imm.a[i - 20] = cur.a[i];
+			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
 		for (int i = 11; i > 6; i--)
-			imm.a[i - 7] = cur.a[i];
-		imm.extend(1, 11);
+			imm |= (1 << (i - 7)) * ((cur >> i) & 1);
+		extend(imm, 11);
 		return;
 
 	case 51:
-		x = 0;
-		for (int i = 11; i > 6; i--)
-			x = (x << 1) | cur.a[i];
-		rd = x;
-		x = 0;
-		for (int i = 19; i > 14; i--)
-			x = (x << 1) | cur.a[i];
-		rs1 = reg[x];
-		x = 0;
-		for (int i = 24; i > 19; i--)
-			x = (x << 1) | cur.a[i];
-		Rs2 = x;
-		rs2 = reg[x];
-		op_ = 0;
-		for (int i = 14; i > 11; i--)
-			op_ = (op_ << 1) | cur.a[i];
-		op__ = cur.a[30];
+		rd = get(cur, 7, 11);
+		rs1 = reg[get(cur, 15, 19)];
+		Rs2 = get(cur, 20, 24);
+		rs2 = reg[Rs2];
+		op_ = get(cur, 12, 14);
+		op__ = get(cur, 30, 30);
 		return;
 	}
 }
@@ -327,11 +174,11 @@ void EX(int id){
 		return;
 
 	case 23:
-		ALUOutput =  imm + trans(npc - 4);
+		ALUOutput =  imm + npc - 4;
 		return;
 
 	case 111:
-		ALUOutput =  imm + trans(npc - 4);
+		ALUOutput =  imm + npc - 4;
 		return;
 
 	case 103:
@@ -339,7 +186,7 @@ void EX(int id){
 		return;
 
 	case 99:
-		ALUOutput =  imm + trans(npc - 4);
+		ALUOutput =  imm + npc - 4;
 		switch (op_){
 			case 0:
 				con = (rs1 == rs2);
@@ -350,19 +197,19 @@ void EX(int id){
 				return;
 
 			case 4:
-				con = rs1.les(rs2);
+				con = les(rs1, rs2);
 				return;
 
 			case 5:
-				con = !rs1.les(rs2);
+				con = !les(rs1, rs2);
 				return;
 
 			case 6:
-				con = rs1.lesu(rs2);
+				con = (rs1 < rs2);
 				return;
 
 			case 7:
-				con = !rs1.lesu(rs2);
+				con = (rs1 >= rs2);
 				return;
 		}
 		return;
@@ -382,11 +229,11 @@ void EX(int id){
 				return;
 
 			case 2:
-				ALUOutput = trans(rs1.les(imm));
+				ALUOutput = les(rs1, imm);
 				return;
 
 			case 3:
-				ALUOutput = trans(rs1.lesu(imm));
+				ALUOutput = (rs1 < imm);
 				return;
 
 			case 4:
@@ -402,11 +249,14 @@ void EX(int id){
 				return;
 
 			case 1:
-				ALUOutput = rs1.sl(sh);
+				ALUOutput = (rs1 << sh);
 				return;
 
 			case 5:
-				ALUOutput = rs1.sr(sh, op__);
+				ALUOutput = rs1 >> sh;
+				if (op__)
+					extend(ALUOutput, 31 - sh);
+			//	ALUOutput = (rs1.sr(sh, op__);
 				return;
 		}
 		return;
@@ -421,15 +271,15 @@ void EX(int id){
 				return;
 
 			case 1:
-				ALUOutput = rs1.sl(rs2.calc());
+				ALUOutput = rs1 << rs2;
 				return;
 
 			case 2:
-				ALUOutput = trans(rs1.les(rs2));
+				ALUOutput = les(rs1, rs2);
 				return;
 
 			case 3:
-				ALUOutput = trans(rs1.lesu(rs2));
+				ALUOutput = (rs1 < rs2);
 				return;
 
 			case 4:
@@ -437,7 +287,10 @@ void EX(int id){
 				return;
 
 			case 5:
-				ALUOutput = rs1.sr(rs2.calc(), op__);
+				ALUOutput = rs1 >> rs2;
+				if (op__)
+					extend(ALUOutput, 31 - rs2);
+			//	ALUOutput = rs1.sr(rs2.calc(), op__);
 				return;
 
 			case 6:
@@ -455,65 +308,55 @@ void EX(int id){
 }
 
 void MEM(int id){
-	pc = npc;
-	int x, len;
 	switch (op){
 	case 111: case 103:
-		pc = ALUOutput.calc();
+		pc = ALUOutput;
 		return;
 
 	case 99:
 		if (con)
-			pc = ALUOutput.calc();
+			pc = ALUOutput;
 		return;
 
 	case 3:
-		x = ALUOutput.calc();
 		switch (op_){
 			case 0: case 4:
-				for (int i = 7; i >= 0; i--)
-					lmd.a[i] = mem[x].a[i];
-				lmd.extend((!op_), 7);
+				lmd = get(mem[ALUOutput], 0, 7);
+				if (!op_)
+					extend(lmd, 7);
 				return;
 
 			case 1: case 5:
-				len = 16;
 				for (int i = 1; i >= 0; i--)
-					for (int j = 7; j >= 0; j--)
-						lmd.a[--len] = mem[x + i].a[j];
-				lmd.extend((op_ == 1), 15);
+					lmd = (lmd << 8) + get(mem[ALUOutput + i], 0, 7);
+				if (op_ == 1)
+					extend(lmd, 15);
 				return;
 
 			case 2:
-				len = 32;
 				for (int i = 3; i >= 0; i--)
-					for (int j = 7; j >= 0; j--)
-						lmd.a[--len] = mem[x + i].a[j];
+					lmd = (lmd << 8) + get(mem[ALUOutput + i], 0, 7);
 				return;
 		}
 		return;
 
 	case 35:
-		x = ALUOutput.calc();
-	//	cout << "!!!" << x << endl;
+	//	cout << "!!!" << ALUOutput << endl;
 		switch (op_){
 			case 0:
-				for (int i = 7; i >= 0; i--)
-					mem[x].a[i] = rs2.a[i];
+				mem[ALUOutput] = get(rs2, 0, 7);
 				return;
 
 			case 1:
-				len = 16;
 				for (int i = 1; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
-						mem[x + i].a[j] = rs2.a[--len];
+						mem[ALUOutput + i] = get(rs2, i * 8, i * 8 + 7);
 				return;
 
 			case 2:
-				len = 32;
 				for (int i = 3; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
-						mem[x + i].a[j] = rs2.a[--len];
+						mem[ALUOutput + i] = get(rs2, i * 8, i * 8 + 7);
 				return;
 
 		}
@@ -529,7 +372,7 @@ void WB(int id){
 		break;
 
 	case 111: case 103:
-		reg[rd] = trans(npc);
+		reg[rd] = npc;
 		break;
 
 	case 3:
@@ -540,9 +383,10 @@ void WB(int id){
 		return;
 
 	}
-	reg[0] = trans(0);	
+	reg[0] = 0;	
 
-	printf("%d %d %d\n", pc, rd, reg[rd].calc());
+//	printf("%d %d %d %d %d %d %d\n", pc, rd, reg[rd], cur, imm, rs1, rs2);
+//	printf("%d %d %d\n", pc, rd, reg[rd]);
 }
 
 int main(){
@@ -551,18 +395,17 @@ int main(){
 	pre();
 	pc = 0;
 	while (1){
+//	for (int i = 1; i <= 10000; i++){
 //		if (pc == 4120)
 //			cerr << '!';
 		IF(1);
-		if (cur.calc() == 267388179)
+		if (cur == 267388179)
 			break;
 		ID(1);
 		EX(1);
 		MEM(1);
 		WB(1);
 	}
-	data x = reg[10];
-	x.extend(0, 7);
-	printf("%d\n", x.calc());
+	printf("%d\n", reg[10] & 255u);
 	return 0;
 }
