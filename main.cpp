@@ -158,8 +158,8 @@ void pre(){
 			x = 0;
 			for (int i = 0; i < 2; i++)
 				x = (x << 4) + tr[s[i]];
-			mem[pc + 3] = trans(x);
-			for (int j = 2; j >= 0; j--){
+			mem[pc] = trans(x);
+			for (int j = 1; j < 4; j++){
 				scanf("%s", s);
 				x = 0;
 				for (int i = 0; i < 2; i++)
@@ -174,7 +174,7 @@ void pre(){
 
 void IF(int id){
 	int len = 32;
-	for (int i = 0; i < 4; i++)
+	for (int i = 3; i >= 0; i--)
 		for (int j = 7; j >= 0; j--)
 			cur.a[--len] = mem[pc + i].a[j];
 	npc = pc + 4;
@@ -477,16 +477,16 @@ void MEM(int id){
 				return;
 
 			case 1: case 5:
-				for (int i = 15; i > 7; i--)
-					lmd.a[i] = mem[x].a[i - 8];
-				for (int i = 7; i >= 0; i--)
-					lmd.a[i] = mem[x + 1].a[i];
+				len = 16;
+				for (int i = 1; i >= 0; i--)
+					for (int j = 7; j >= 0; j--)
+						lmd.a[--len] = mem[x + i].a[j];
 				lmd.extend((op_ == 1), 15);
 				return;
 
 			case 2:
 				len = 32;
-				for (int i = 0; i < 4; i++)
+				for (int i = 3; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
 						lmd.a[--len] = mem[x + i].a[j];
 				return;
@@ -495,7 +495,7 @@ void MEM(int id){
 
 	case 35:
 		x = ALUOutput.calc();
-	//	cerr << "!!!" << x << endl;
+	//	cout << "!!!" << x << endl;
 		switch (op_){
 			case 0:
 				for (int i = 7; i >= 0; i--)
@@ -504,14 +504,14 @@ void MEM(int id){
 
 			case 1:
 				len = 16;
-				for (int i = 0; i < 2; i++)
+				for (int i = 1; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
 						mem[x + i].a[j] = rs2.a[--len];
 				return;
 
 			case 2:
 				len = 32;
-				for (int i = 0; i < 4; i++)
+				for (int i = 3; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
 						mem[x + i].a[j] = rs2.a[--len];
 				return;
@@ -542,15 +542,16 @@ void WB(int id){
 	}
 	reg[0] = trans(0);	
 
-//	printf("%d %d %d\n", pc, rd, reg[rd].calc());
+	printf("%d %d %d\n", pc, rd, reg[rd].calc());
 }
 
 int main(){
-//	freopen("pi.data", "r", stdin);
+//	freopen("hanoi.data", "r", stdin);
+//	freopen("1.out", "w", stdout);
 	pre();
 	pc = 0;
 	while (1){
-//		if (pc == 8)
+//		if (pc == 4120)
 //			cerr << '!';
 		IF(1);
 		if (cur.calc() == 267388179)
