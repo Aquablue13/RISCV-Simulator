@@ -546,7 +546,7 @@ void WB(int id){
 }
 
 int main(){
-	freopen("pi.data", "r", stdin);
+//	freopen("pi.data", "r", stdin);
 	pre();
 	pc = 0;
 	while (1){
