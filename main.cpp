@@ -7,9 +7,11 @@ typedef unsigned int uint;
 const int N = 34;
 const int M = 2e5;
 const int K = 10;
-int cur[2][5], op, ist, cnt(0), A(0), B(0), pre[4096];
+int cur[2][5], op, ist, cnt(0), pre[4096];
 uint pc, mem[M], reg[N], tr[200];
-bool fr[N], fl;
+bool fl;
+int fr[N];
+long long A(0), B(0);
 
 class IFID{
 public:
@@ -292,7 +294,7 @@ void ID(int id){
 
 	switch (IDEX[id].op){
 	case 55: case 23: case 19: case 51: case 111: case 103: case 3:
-		fr[IDEX[id].rd] = 1;
+		fr[IDEX[id].rd]++;
 		break;
 
 	}
@@ -505,24 +507,22 @@ void MEM(int id){
 void WB(int id){
 	if (!id)
 		return;
-//	if (ist[op][4])
-//		return;
 	switch (MEMWB[id].op){
 	case 0:
 		break;
 	case 55: case 23: case 19: case 51:
 		reg[MEMWB[id].rd] = MEMWB[id].ALUOutput;
-		fr[MEMWB[id].rd] = 0;
+		fr[MEMWB[id].rd]--;
 		break;
 
 	case 111: case 103:
 		reg[MEMWB[id].rd] = MEMWB[id].npc;
-		fr[MEMWB[id].rd] = 0;
+		fr[MEMWB[id].rd]--;
 		break;
 
 	case 3:
 		reg[MEMWB[id].rd] = MEMWB[id].lmd;
-		fr[MEMWB[id].rd] = 0;
+		fr[MEMWB[id].rd]--;
 		break;
 
 	default:
@@ -532,32 +532,35 @@ void WB(int id){
 	reg[0] = 0;	
 
 //	printf("%d %d %d %d %d %d %d\n", pc, rd, reg[rd], cur, IDEX[id].imm, rs1, rs2);
-//	printf("%d %d %d\n", pc, MEMWB[id].rd, reg[MEMWB[id].rd]);
+//	if ((IFID[id].cur & 127u) != 0b0100011 && (IFID[id].cur & 127u) != 0b1100011)
+//		printf("%d %d %d\n", MEMWB[id].npc - 4, MEMWB[id].rd, reg[MEMWB[id].rd]);
 }
 
 void work(int x, bool y){
 	A += y;
 	B++;
-	if (y && pre[x] != 3)
+	if (y && pre[x] < 1)
 		pre[x]++;
-	if (!y && pre[x])
+	if (!y && pre[x] > -2)
 		pre[x]--;
 }
 
 int main(){
-//	freopen("sample.data", "r", stdin);
+//	freopen("qsort.data", "r", stdin);
 //	freopen("1.out", "w", stdout);
 	Pre();
 	int T(0);
 	pc = op = cnt = 0;
-	int x;
+	int x, ise(0);
 	while (1){
 //	for (int i = 1; i <= 10; i++){
 //		if (pc == 4120)
 //			cerr << '!';
-		ist = 0;
+		ist = ise;
 		for (int i = 0; i < 5; i++)
 			cur[op ^ 1][i] = 0;
+		if (IFID[cur[op][4]].cur == 267388179)
+			break;
 		WB(cur[op][4]);
 		MEM(cur[op][3]);
 		EX(cur[op][2]);
@@ -566,9 +569,13 @@ int main(){
 		if (!ist){
 			if (cur[op][1] && IDEX[cur[op][1]].op == 99){
 				x = (IDEX[cur[op][1]].npc - 4) >> 2;
-				bool p = (pre[x] > 1);
+				bool p = (pre[x] > -1);
+			//	if (x == 1103)
+			//		cerr << '!';
+			//	printf("%u %d %d\n", x, pre[x], p ^ (pc == IDEX[cur[op][1]].npc));
+			//	printf("%d %d %d\n", p, pc, IDEX[cur[op][1]].npc);
 			//	cerr << "!!!!!!" << pc << ' ' << p << endl;
-				if (p ^ (pc != IDEX[cur[op][1]].npc)){
+				if (p ^ (pc == IDEX[cur[op][1]].npc)){
 					work(x, 1);
 				}
 				else{
@@ -584,7 +591,7 @@ int main(){
 				cnt -= 5;
 			IF(cur[op][0] = cnt);
 			if (IFID[cur[op][0]].cur == 267388179)
-				break;
+				ise = 1;
 		}
 		
 		op ^= 1;
@@ -594,7 +601,7 @@ int main(){
 			T++;
 	//	cerr << T << ' ' << pc << endl;
 	}
-//	cerr << (double)A/B << endl;
+//	cerr << B << ' ' << (double)A/B << endl;
 	printf("%d\n", reg[10] & 255u);
 	return 0;
 }
