@@ -7,11 +7,38 @@ typedef unsigned int uint;
 const int N = 34;
 const int M = 2e5;
 const int K = 10;
-uint pc, npc, op, op_, op__, rd;
-uint sh, Rs2, tr[200];
-bool con;
+int cur[5];
+uint pc, mem[M], reg[N], tr[200];
 
-uint mem[M], reg[N], cur, imm, ALUOutput, lmd, rs1, rs2;
+class IFID{
+public:
+	uint cur, npc;
+}IFID[5];
+
+class IDEX{
+public:
+	uint imm, op, op_, op__, sh, rd, rs1, rs2, npc;
+	IDEX(){
+		op = 0;
+	}
+}IDEX[5];
+
+class EXMEM{
+public:
+	uint ALUOutput, rd, op, op_, rs2, npc;
+	bool con;
+	EXMEM(){
+		op = 0;
+	}
+}EXMEM[5];
+
+class MEMWB{
+public:
+	uint rd, op, lmd, npc, ALUOutput;
+	MEMWB(){
+		op = 0;
+	}
+}MEMWB[5];
 
 void extend(uint &x, int p){
 	if ((x >> p) & 1)
@@ -65,346 +92,372 @@ void pre(){
 	
 }
 
-void IF(int id){
+void IF(int id, bool isn){
 	int len = 32;
-	cur = 0;
+	IFID[id].cur = 0;
+	if (isn)
+		return;
 	for (int i = 3; i >= 0; i--)
-		cur = (cur << 8) + mem[pc + i];
-	npc = (pc += 4);
+		IFID[id].cur = (IFID[id].cur << 8) + mem[pc + i];
+	IFID[id].npc = (pc += 4);
 }
 
 uint get(uint x, int l, int r){
+	return (x >> l) & ((1 << (r - l + 1)) - 1);/*
 	uint s = 0;
 	for (int i = r; i >= l; i--)
 		s = (s << 1) | ((x >> i) & 1);
-	return s;
+	return s;*/
 }
 
 void ID(int id){
-	op = get(cur, 0, 6);
-	switch (op){
+	IDEX[id].op = get(IFID[id].cur, 0, 6);
+	switch (IDEX[id].op){
+	case 0: //nop
+		break;
 	case 23: case 55: //LUI AUIPC
-		rd = get(cur, 7, 11);
-		imm = 0;
+		IDEX[id].rd = get(IFID[id].cur, 7, 11);
+		IDEX[id].imm = 0;
 		for (int i = 31; i > 11; i--)
-			imm |= (1u << i) * ((cur >> i) & 1);
-		return;
+			IDEX[id].imm |= (1u << i) * ((IFID[id].cur >> i) & 1);
+		break;
 	
 	case 111: //JAL
-		rd = get(cur, 7, 11);
-		imm = 0;
-		imm |= (1 << 20) * ((cur >> 31) & 1);
+		IDEX[id].rd = get(IFID[id].cur, 7, 11);
+		IDEX[id].imm = 0;
+		IDEX[id].imm |= (1 << 20) * ((IFID[id].cur >> 31) & 1);
 		for (int i = 30; i > 20; i--)
-			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
-		imm |= (1 << 11) * ((cur >> 20) & 1);
+			IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
+		IDEX[id].imm |= (1 << 11) * ((IFID[id].cur >> 20) & 1);
 		for (int i = 19; i > 11; i--)
-			imm |= (1 << i) * ((cur >> i) & 1);
-		extend(imm, 19);
-		return;
+			IDEX[id].imm |= (1 << i) * ((IFID[id].cur >> i) & 1);
+		extend(IDEX[id].imm, 19);
+		break;
 
 	case 103: case 3: //JALR 
-		rd = get(cur, 7, 11);
-		rs1 = reg[get(cur, 15, 19)];
-		op_ = get(cur, 12, 14);
-		imm = 0;
+		IDEX[id].rd = get(IFID[id].cur, 7, 11);
+		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
+		IDEX[id].imm = 0;
 		for (int i = 31; i > 19; i--)
-			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
-		extend(imm, 11);
-		return;
+			IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
+		extend(IDEX[id].imm, 11);
+		break;
 
 	case 99:
-		rs1 = reg[get(cur, 15, 19)];
-		Rs2 = get(cur, 20, 24);
-		rs2 = reg[Rs2];
-		op_ = get(cur, 12, 14);
-		imm = 0;
-		imm |= (1 << 12) * ((cur >> 31) & 1);
+		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+	//	IDEX[id].Rs2 = get(IFID[id].cur, 20, 24);
+		IDEX[id].rs2 = reg[get(IFID[id].cur, 20, 24)];
+		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
+		IDEX[id].imm = 0;
+		IDEX[id].imm |= (1 << 12) * ((IFID[id].cur >> 31) & 1);
 		for (int i = 30; i > 24; i--)
-			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
+			IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
 		for (int i = 11; i > 7; i--)
-			imm |= (1 << (i - 7)) * ((cur >> i) & 1);
-		imm |= (1 << 11) * ((cur >> 7) & 1);
-		extend(imm, 12);
-		return;
+			IDEX[id].imm |= (1 << (i - 7)) * ((IFID[id].cur >> i) & 1);
+		IDEX[id].imm |= (1 << 11) * ((IFID[id].cur >> 7) & 1);
+		extend(IDEX[id].imm, 12);
+		break;
 
 	case 19:
-		rd = get(cur, 7, 11);
-		rs1 = reg[get(cur, 15, 19)];
-		op_ = get(cur, 12, 14);
-		if (op_ == 1 || op_ == 5){
-			sh = get(cur, 20, 25);
+		IDEX[id].rd = get(IFID[id].cur, 7, 11);
+		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
+		if (IDEX[id].op_ == 1 || IDEX[id].op_ == 5){
+			IDEX[id].sh = get(IFID[id].cur, 20, 25);
 		}
 		else{
-			imm = 0;
+			IDEX[id].imm = 0;
 			for (int i = 31; i > 19; i--)
-				imm |= (1 << (i - 20)) * ((cur >> i) & 1);
-			extend(imm, 11);
+				IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
+			extend(IDEX[id].imm, 11);
 		}
-		op__ = get(cur, 30, 30);;
-		return;
+		IDEX[id].op__ = get(IFID[id].cur, 30, 30);;
+		break;
 
 	case 35:
-		rs1 = reg[get(cur, 15, 19)];
-		Rs2 = get(cur, 20, 24);
-		rs2 = reg[Rs2];
-		op_ = get(cur, 12, 14);
-		imm = 0;
+		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+	//	Rs2 = get(IFID[id].cur, 20, 24);
+		IDEX[id].rs2 = reg[get(IFID[id].cur, 20, 24)];
+		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
+		IDEX[id].imm = 0;
 		for (int i = 31; i > 24; i--)
-			imm |= (1 << (i - 20)) * ((cur >> i) & 1);
+			IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
 		for (int i = 11; i > 6; i--)
-			imm |= (1 << (i - 7)) * ((cur >> i) & 1);
-		extend(imm, 11);
-		return;
+			IDEX[id].imm |= (1 << (i - 7)) * ((IFID[id].cur >> i) & 1);
+		extend(IDEX[id].imm, 11);
+		break;
 
 	case 51:
-		rd = get(cur, 7, 11);
-		rs1 = reg[get(cur, 15, 19)];
-		Rs2 = get(cur, 20, 24);
-		rs2 = reg[Rs2];
-		op_ = get(cur, 12, 14);
-		op__ = get(cur, 30, 30);
-		return;
+		IDEX[id].rd = get(IFID[id].cur, 7, 11);
+		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+	//	Rs2 = get(IFID[id].cur, 20, 24);
+		IDEX[id].rs2 = reg[get(IFID[id].cur, 20, 24)];
+		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
+		IDEX[id].op__ = get(IFID[id].cur, 30, 30);
+		break;
 	}
+
+	IDEX[id].npc = IFID[id].npc;
 }
 
 void EX(int id){
-	switch (op){
+	switch (IDEX[id].op){
+	case 0:
+		break;
 	case 55:
-		ALUOutput = imm;
-		return;
+		EXMEM[id].ALUOutput = IDEX[id].imm;
+		break;
 
 	case 23:
-		ALUOutput =  imm + npc - 4;
-		return;
+		EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;
+		break;
 
 	case 111:
-		ALUOutput =  imm + npc - 4;
-		return;
+		EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;
+		break;
 
 	case 103:
-		ALUOutput = imm + rs1;
-		return;
+		EXMEM[id].ALUOutput = IDEX[id].imm + IDEX[id].rs1;
+		break;
 
 	case 99:
-		ALUOutput =  imm + npc - 4;
-		switch (op_){
+		EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;
+		switch (IDEX[id].op_){
 			case 0:
-				con = (rs1 == rs2);
-				return;
+				EXMEM[id].con = (IDEX[id].rs1 == IDEX[id].rs2);
+				break;
 
 			case 1:
-				con = !(rs1 == rs2);
-				return;
+				EXMEM[id].con = !(IDEX[id].rs1 == IDEX[id].rs2);
+				break;
 
 			case 4:
-				con = les(rs1, rs2);
-				return;
+				EXMEM[id].con = les(IDEX[id].rs1, IDEX[id].rs2);
+				break;
 
 			case 5:
-				con = !les(rs1, rs2);
-				return;
+				EXMEM[id].con = !les(IDEX[id].rs1, IDEX[id].rs2);
+				break;
 
 			case 6:
-				con = (rs1 < rs2);
-				return;
+				EXMEM[id].con = (IDEX[id].rs1 < IDEX[id].rs2);
+				break;
 
 			case 7:
-				con = (rs1 >= rs2);
-				return;
+				EXMEM[id].con = (IDEX[id].rs1 >= IDEX[id].rs2);
+				break;
 		}
-		return;
+		break;
 
 	case 3:
-		ALUOutput = imm + rs1;
-		return;
+		EXMEM[id].ALUOutput = IDEX[id].imm + IDEX[id].rs1;
+		break;
 
 	case 35:
-		ALUOutput = imm + rs1;
-		return;
+		EXMEM[id].ALUOutput = IDEX[id].imm + IDEX[id].rs1;
+		break;
 
 	case 19:
-		switch (op_){
+		switch (IDEX[id].op_){
 			case 0:
-				ALUOutput = imm + rs1;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].imm + IDEX[id].rs1;
+				break;
 
 			case 2:
-				ALUOutput = les(rs1, imm);
-				return;
+				EXMEM[id].ALUOutput = les(IDEX[id].rs1, IDEX[id].imm);
+				break;
 
 			case 3:
-				ALUOutput = (rs1 < imm);
-				return;
+				EXMEM[id].ALUOutput = (IDEX[id].rs1 < IDEX[id].imm);
+				break;
 
 			case 4:
-				ALUOutput = imm ^ rs1;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].imm ^ IDEX[id].rs1;
+				break;
 
 			case 6:
-				ALUOutput = imm | rs1;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].imm | IDEX[id].rs1;
+				break;
 
 			case 7:
-				ALUOutput = imm & rs1;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].imm & IDEX[id].rs1;
+				break;
 
 			case 1:
-				ALUOutput = (rs1 << sh);
-				return;
+				EXMEM[id].ALUOutput = (IDEX[id].rs1 << IDEX[id].sh);
+				break;
 
 			case 5:
-				ALUOutput = rs1 >> sh;
-				if (op__)
-					extend(ALUOutput, 31 - sh);
-			//	ALUOutput = (rs1.sr(sh, op__);
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].rs1 >> IDEX[id].sh;
+				if (IDEX[id].op__)
+					extend(EXMEM[id].ALUOutput, 31 - IDEX[id].sh);
+			//	EXMEM[id].ALUOutput = (IDEX[id].rs1.sr(IDEX[id].sh, IDEX[id].op__);
+				break;
 		}
-		return;
+		break;
 
 	case 51:
-		switch (op_){
+		switch (IDEX[id].op_){
 			case 0:
-				if (op__)
-					ALUOutput = rs1 - rs2;
+				if (IDEX[id].op__)
+					EXMEM[id].ALUOutput = IDEX[id].rs1 - IDEX[id].rs2;
 				else
-					ALUOutput = rs1 + rs2;
-				return;
+					EXMEM[id].ALUOutput = IDEX[id].rs1 + IDEX[id].rs2;
+				break;
 
 			case 1:
-				ALUOutput = rs1 << rs2;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].rs1 << IDEX[id].rs2;
+				break;
 
 			case 2:
-				ALUOutput = les(rs1, rs2);
-				return;
+				EXMEM[id].ALUOutput = les(IDEX[id].rs1, IDEX[id].rs2);
+				break;
 
 			case 3:
-				ALUOutput = (rs1 < rs2);
-				return;
+				EXMEM[id].ALUOutput = (IDEX[id].rs1 < IDEX[id].rs2);
+				break;
 
 			case 4:
-				ALUOutput = rs1 ^ rs2;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].rs1 ^ IDEX[id].rs2;
+				break;
 
 			case 5:
-				ALUOutput = rs1 >> rs2;
-				if (op__)
-					extend(ALUOutput, 31 - rs2);
-			//	ALUOutput = rs1.sr(rs2.calc(), op__);
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].rs1 >> IDEX[id].rs2;
+				if (IDEX[id].op__)
+					extend(EXMEM[id].ALUOutput, 31 - IDEX[id].rs2);
+			//	EXMEM[id].ALUOutput = IDEX[id].rs1.sr(IDEX[id].rs2.calc(), IDEX[id].op__);
+				break;
 
 			case 6:
-				ALUOutput = rs1 | rs2;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].rs1 | IDEX[id].rs2;
+				break;
 
 			case 7:
-				ALUOutput = rs1 & rs2;
-				return;
+				EXMEM[id].ALUOutput = IDEX[id].rs1 & IDEX[id].rs2;
+				break;
 
 		}
-		return;
+		break;
 
 	}
+
+	EXMEM[id].npc = IDEX[id].npc;
+	EXMEM[id].rd = IDEX[id].rd;
+	EXMEM[id].op = IDEX[id].op;
+	EXMEM[id].op_ = IDEX[id].op_;
+	EXMEM[id].rs2 = IDEX[id].rs2;
 }
 
 void MEM(int id){
-	switch (op){
+	switch (EXMEM[id].op){
+	case 0:
+		break;
 	case 111: case 103:
-		pc = ALUOutput;
-		return;
+		pc = EXMEM[id].ALUOutput;
+		break;
 
 	case 99:
-		if (con)
-			pc = ALUOutput;
-		return;
+		if (EXMEM[id].con)
+			pc = EXMEM[id].ALUOutput;
+		break;
 
 	case 3:
-		switch (op_){
+		switch (EXMEM[id].op_){
 			case 0: case 4:
-				lmd = get(mem[ALUOutput], 0, 7);
-				if (!op_)
-					extend(lmd, 7);
-				return;
+				MEMWB[id].lmd = get(mem[EXMEM[id].ALUOutput], 0, 7);
+				if (!EXMEM[id].op_)
+					extend(MEMWB[id].lmd, 7);
+				break;
 
 			case 1: case 5:
 				for (int i = 1; i >= 0; i--)
-					lmd = (lmd << 8) + get(mem[ALUOutput + i], 0, 7);
-				if (op_ == 1)
-					extend(lmd, 15);
-				return;
+					MEMWB[id].lmd = (MEMWB[id].lmd << 8) + get(mem[EXMEM[id].ALUOutput + i], 0, 7);
+				if (EXMEM[id].op_ == 1)
+					extend(MEMWB[id].lmd, 15);
+				break;
 
 			case 2:
 				for (int i = 3; i >= 0; i--)
-					lmd = (lmd << 8) + get(mem[ALUOutput + i], 0, 7);
-				return;
+					MEMWB[id].lmd = (MEMWB[id].lmd << 8) + get(mem[EXMEM[id].ALUOutput + i], 0, 7);
+				break;
 		}
-		return;
+		break;
 
 	case 35:
-	//	cout << "!!!" << ALUOutput << endl;
-		switch (op_){
+	//	cout << "!!!" << EXMEM[id].ALUOutput << endl;
+		switch (EXMEM[id].op_){
 			case 0:
-				mem[ALUOutput] = get(rs2, 0, 7);
-				return;
+				mem[EXMEM[id].ALUOutput] = get(EXMEM[id].rs2, 0, 7);
+				break;
 
 			case 1:
 				for (int i = 1; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
-						mem[ALUOutput + i] = get(rs2, i * 8, i * 8 + 7);
-				return;
+						mem[EXMEM[id].ALUOutput + i] = get(EXMEM[id].rs2, i * 8, i * 8 + 7);
+				break;
 
 			case 2:
 				for (int i = 3; i >= 0; i--)
 					for (int j = 7; j >= 0; j--)
-						mem[ALUOutput + i] = get(rs2, i * 8, i * 8 + 7);
-				return;
+						mem[EXMEM[id].ALUOutput + i] = get(EXMEM[id].rs2, i * 8, i * 8 + 7);
+				break;
 
 		}
-		return;
+		break;
 
 	}
+
+	MEMWB[id].ALUOutput = EXMEM[id].ALUOutput;
+	MEMWB[id].npc = EXMEM[id].npc;
+	MEMWB[id].rd = EXMEM[id].rd;
+	MEMWB[id].op = EXMEM[id].op;
 }
 
 void WB(int id){
-	switch (op){
+	switch (MEMWB[id].op){
+	case 0:
+		break;
 	case 55: case 23: case 19: case 51:
-		reg[rd] = ALUOutput;
+		reg[MEMWB[id].rd] = MEMWB[id].ALUOutput;
 		break;
 
 	case 111: case 103:
-		reg[rd] = npc;
+		reg[MEMWB[id].rd] = MEMWB[id].npc;
 		break;
 
 	case 3:
-		reg[rd] = lmd;
+		reg[MEMWB[id].rd] = MEMWB[id].lmd;
 		break;
 
 	default:
-		return;
+		break;
 
 	}
 	reg[0] = 0;	
 
-//	printf("%d %d %d %d %d %d %d\n", pc, rd, reg[rd], cur, imm, rs1, rs2);
+//	printf("%d %d %d %d %d %d %d\n", pc, rd, reg[rd], cur, IDEX[id].imm, rs1, rs2);
 //	printf("%d %d %d\n", pc, rd, reg[rd]);
 }
 
 int main(){
-//	freopen("hanoi.data", "r", stdin);
+//	freopen("tak.data", "r", stdin);
 //	freopen("1.out", "w", stdout);
 	pre();
 	pc = 0;
+	for (int i = 0; i < 4; i++)
+		cur[i] = 0;
 	while (1){
 //	for (int i = 1; i <= 10000; i++){
 //		if (pc == 4120)
 //			cerr << '!';
-		IF(1);
-		if (cur == 267388179)
+		IF(cur[0], 0);
+		if (IFID[cur[0]].cur == 267388179)
 			break;
-		ID(1);
-		EX(1);
-		MEM(1);
-		WB(1);
+		ID(cur[1]);
+		EX(cur[2]);
+		MEM(cur[3]);
+		WB(cur[4]);
 	}
 	printf("%d\n", reg[10] & 255u);
 	return 0;
