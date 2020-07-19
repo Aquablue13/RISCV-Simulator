@@ -7,13 +7,14 @@ typedef unsigned int uint;
 const int N = 34;
 const int M = 2e5;
 const int K = 10;
-int cur[5];
+int cur[2][5], op, ist, cnt(0), A(0), B(0), pre[4096];
 uint pc, mem[M], reg[N], tr[200];
+bool fr[N], fl;
 
 class IFID{
 public:
 	uint cur, npc;
-}IFID[5];
+}IFID[6];
 
 class IDEX{
 public:
@@ -21,7 +22,7 @@ public:
 	IDEX(){
 		op = 0;
 	}
-}IDEX[5];
+}IDEX[6];
 
 class EXMEM{
 public:
@@ -30,7 +31,7 @@ public:
 	EXMEM(){
 		op = 0;
 	}
-}EXMEM[5];
+}EXMEM[6];
 
 class MEMWB{
 public:
@@ -38,7 +39,7 @@ public:
 	MEMWB(){
 		op = 0;
 	}
-}MEMWB[5];
+}MEMWB[6];
 
 void extend(uint &x, int p){
 	if ((x >> p) & 1)
@@ -60,7 +61,7 @@ uint les(uint x, uint y){
 	return 0;
 }
 
-void pre(){
+void Pre(){
 	for (int i = 0; i < 10; i++)
 		tr[int('0') + i] = i;
 	for (int i = 10; i < 16; i++)
@@ -92,16 +93,6 @@ void pre(){
 	
 }
 
-void IF(int id, bool isn){
-	int len = 32;
-	IFID[id].cur = 0;
-	if (isn)
-		return;
-	for (int i = 3; i >= 0; i--)
-		IFID[id].cur = (IFID[id].cur << 8) + mem[pc + i];
-	IFID[id].npc = (pc += 4);
-}
-
 uint get(uint x, int l, int r){
 	return (x >> l) & ((1 << (r - l + 1)) - 1);/*
 	uint s = 0;
@@ -110,8 +101,34 @@ uint get(uint x, int l, int r){
 	return s;*/
 }
 
-void ID(int id){
+void IF(int id){
+	int len = 32;
+	IFID[id].cur = 0;
+	for (int i = 3; i >= 0; i--)
+		IFID[id].cur = (IFID[id].cur << 8) + mem[pc + i];
+	IFID[id].npc = (pc += 4);
+
 	IDEX[id].op = get(IFID[id].cur, 0, 6);
+	if (IDEX[id].op == 111){
+		IDEX[id].imm = 0;
+		IDEX[id].imm |= (1 << 20) * ((IFID[id].cur >> 31) & 1);
+		for (int i = 30; i > 20; i--)
+			IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
+		IDEX[id].imm |= (1 << 11) * ((IFID[id].cur >> 20) & 1);
+		for (int i = 19; i > 11; i--)
+			IDEX[id].imm |= (1 << i) * ((IFID[id].cur >> i) & 1);
+		extend(IDEX[id].imm, 19);
+		pc = IDEX[id].imm + IFID[id].npc - 4;
+	}
+
+	cur[op ^ 1][1] = cur[op][0];
+}
+
+void ID(int id){
+	if (!id)
+		return;
+	IDEX[id].npc = IFID[id].npc;
+	int x;
 	switch (IDEX[id].op){
 	case 0: //nop
 		break;
@@ -123,7 +140,7 @@ void ID(int id){
 		break;
 	
 	case 111: //JAL
-		IDEX[id].rd = get(IFID[id].cur, 7, 11);
+		IDEX[id].rd = get(IFID[id].cur, 7, 11);/*
 		IDEX[id].imm = 0;
 		IDEX[id].imm |= (1 << 20) * ((IFID[id].cur >> 31) & 1);
 		for (int i = 30; i > 20; i--)
@@ -131,23 +148,42 @@ void ID(int id){
 		IDEX[id].imm |= (1 << 11) * ((IFID[id].cur >> 20) & 1);
 		for (int i = 19; i > 11; i--)
 			IDEX[id].imm |= (1 << i) * ((IFID[id].cur >> i) & 1);
-		extend(IDEX[id].imm, 19);
+		extend(IDEX[id].imm, 19);*/
 		break;
 
 	case 103: case 3: //JALR 
 		IDEX[id].rd = get(IFID[id].cur, 7, 11);
-		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+		x = get(IFID[id].cur, 15, 19);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs1 = reg[x];
 		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
 		IDEX[id].imm = 0;
 		for (int i = 31; i > 19; i--)
 			IDEX[id].imm |= (1 << (i - 20)) * ((IFID[id].cur >> i) & 1);
 		extend(IDEX[id].imm, 11);
+		if (IDEX[id].op == 103)
+			pc = IDEX[id].imm + IDEX[id].rs1;
 		break;
 
 	case 99:
-		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
-	//	IDEX[id].Rs2 = get(IFID[id].cur, 20, 24);
-		IDEX[id].rs2 = reg[get(IFID[id].cur, 20, 24)];
+		x = get(IFID[id].cur, 15, 19);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs1 = reg[x];
+		x = get(IFID[id].cur, 20, 24);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs2 = reg[x];
 		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
 		IDEX[id].imm = 0;
 		IDEX[id].imm |= (1 << 12) * ((IFID[id].cur >> 31) & 1);
@@ -157,11 +193,45 @@ void ID(int id){
 			IDEX[id].imm |= (1 << (i - 7)) * ((IFID[id].cur >> i) & 1);
 		IDEX[id].imm |= (1 << 11) * ((IFID[id].cur >> 7) & 1);
 		extend(IDEX[id].imm, 12);
+		bool con;
+		switch (IDEX[id].op_){
+			case 0:
+				con = (IDEX[id].rs1 == IDEX[id].rs2);
+				break;
+
+			case 1:
+				con = !(IDEX[id].rs1 == IDEX[id].rs2);
+				break;
+
+			case 4:
+				con = les(IDEX[id].rs1, IDEX[id].rs2);
+				break;
+
+			case 5:
+				con = !les(IDEX[id].rs1, IDEX[id].rs2);
+				break;
+
+			case 6:
+				con = (IDEX[id].rs1 < IDEX[id].rs2);
+				break;
+
+			case 7:
+				con = (IDEX[id].rs1 >= IDEX[id].rs2);
+				break;
+		}
+		if (con)
+			pc = IDEX[id].imm + IDEX[id].npc - 4;
 		break;
 
 	case 19:
 		IDEX[id].rd = get(IFID[id].cur, 7, 11);
-		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
+		x = get(IFID[id].cur, 15, 19);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs1 = reg[x];
 		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
 		if (IDEX[id].op_ == 1 || IDEX[id].op_ == 5){
 			IDEX[id].sh = get(IFID[id].cur, 20, 25);
@@ -176,9 +246,20 @@ void ID(int id){
 		break;
 
 	case 35:
-		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
-	//	Rs2 = get(IFID[id].cur, 20, 24);
-		IDEX[id].rs2 = reg[get(IFID[id].cur, 20, 24)];
+		x = get(IFID[id].cur, 15, 19);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs1 = reg[x];
+		x = get(IFID[id].cur, 20, 24);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs2 = reg[x];
 		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
 		IDEX[id].imm = 0;
 		for (int i = 31; i > 24; i--)
@@ -190,18 +271,38 @@ void ID(int id){
 
 	case 51:
 		IDEX[id].rd = get(IFID[id].cur, 7, 11);
-		IDEX[id].rs1 = reg[get(IFID[id].cur, 15, 19)];
-	//	Rs2 = get(IFID[id].cur, 20, 24);
-		IDEX[id].rs2 = reg[get(IFID[id].cur, 20, 24)];
+		x = get(IFID[id].cur, 15, 19);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs1 = reg[x];
+		x = get(IFID[id].cur, 20, 24);
+		if (fr[x]){
+			cur[op ^ 1][1] = cur[op][1];
+			ist = 1;
+			return;
+		}
+		IDEX[id].rs2 = reg[x];
 		IDEX[id].op_ = get(IFID[id].cur, 12, 14);
 		IDEX[id].op__ = get(IFID[id].cur, 30, 30);
 		break;
 	}
 
-	IDEX[id].npc = IFID[id].npc;
+	switch (IDEX[id].op){
+	case 55: case 23: case 19: case 51: case 111: case 103: case 3:
+		fr[IDEX[id].rd] = 1;
+		break;
+
+	}
+
+	cur[op ^ 1][2] = cur[op][1];
 }
 
 void EX(int id){
+	if (!id)
+		return;
 	switch (IDEX[id].op){
 	case 0:
 		break;
@@ -214,40 +315,15 @@ void EX(int id){
 		break;
 
 	case 111:
-		EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;
+	//	EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;
 		break;
 
 	case 103:
-		EXMEM[id].ALUOutput = IDEX[id].imm + IDEX[id].rs1;
+	//	EXMEM[id].ALUOutput = IDEX[id].imm + IDEX[id].rs1;
 		break;
 
 	case 99:
-		EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;
-		switch (IDEX[id].op_){
-			case 0:
-				EXMEM[id].con = (IDEX[id].rs1 == IDEX[id].rs2);
-				break;
-
-			case 1:
-				EXMEM[id].con = !(IDEX[id].rs1 == IDEX[id].rs2);
-				break;
-
-			case 4:
-				EXMEM[id].con = les(IDEX[id].rs1, IDEX[id].rs2);
-				break;
-
-			case 5:
-				EXMEM[id].con = !les(IDEX[id].rs1, IDEX[id].rs2);
-				break;
-
-			case 6:
-				EXMEM[id].con = (IDEX[id].rs1 < IDEX[id].rs2);
-				break;
-
-			case 7:
-				EXMEM[id].con = (IDEX[id].rs1 >= IDEX[id].rs2);
-				break;
-		}
+	//	EXMEM[id].ALUOutput =  IDEX[id].imm + IDEX[id].npc - 4;	
 		break;
 
 	case 3:
@@ -347,12 +423,20 @@ void EX(int id){
 	EXMEM[id].op = IDEX[id].op;
 	EXMEM[id].op_ = IDEX[id].op_;
 	EXMEM[id].rs2 = IDEX[id].rs2;
+
+	cur[op ^ 1][3] = cur[op][2];
 }
 
 void MEM(int id){
+	fl = 0;
+	if (!id)
+		return;
+//	if (ist[op][3]){
+//		ist[op ^ 1][]
+//	}
 	switch (EXMEM[id].op){
 	case 0:
-		break;
+		break;/*
 	case 111: case 103:
 		pc = EXMEM[id].ALUOutput;
 		break;
@@ -361,7 +445,7 @@ void MEM(int id){
 		if (EXMEM[id].con)
 			pc = EXMEM[id].ALUOutput;
 		break;
-
+*/
 	case 3:
 		switch (EXMEM[id].op_){
 			case 0: case 4:
@@ -382,6 +466,7 @@ void MEM(int id){
 					MEMWB[id].lmd = (MEMWB[id].lmd << 8) + get(mem[EXMEM[id].ALUOutput + i], 0, 7);
 				break;
 		}
+		fl = 1;
 		break;
 
 	case 35:
@@ -404,6 +489,7 @@ void MEM(int id){
 				break;
 
 		}
+		fl = 1;
 		break;
 
 	}
@@ -412,22 +498,31 @@ void MEM(int id){
 	MEMWB[id].npc = EXMEM[id].npc;
 	MEMWB[id].rd = EXMEM[id].rd;
 	MEMWB[id].op = EXMEM[id].op;
+
+	cur[op ^ 1][4] = cur[op][3];
 }
 
 void WB(int id){
+	if (!id)
+		return;
+//	if (ist[op][4])
+//		return;
 	switch (MEMWB[id].op){
 	case 0:
 		break;
 	case 55: case 23: case 19: case 51:
 		reg[MEMWB[id].rd] = MEMWB[id].ALUOutput;
+		fr[MEMWB[id].rd] = 0;
 		break;
 
 	case 111: case 103:
 		reg[MEMWB[id].rd] = MEMWB[id].npc;
+		fr[MEMWB[id].rd] = 0;
 		break;
 
 	case 3:
 		reg[MEMWB[id].rd] = MEMWB[id].lmd;
+		fr[MEMWB[id].rd] = 0;
 		break;
 
 	default:
@@ -437,28 +532,69 @@ void WB(int id){
 	reg[0] = 0;	
 
 //	printf("%d %d %d %d %d %d %d\n", pc, rd, reg[rd], cur, IDEX[id].imm, rs1, rs2);
-//	printf("%d %d %d\n", pc, rd, reg[rd]);
+//	printf("%d %d %d\n", pc, MEMWB[id].rd, reg[MEMWB[id].rd]);
+}
+
+void work(int x, bool y){
+	A += y;
+	B++;
+	if (y && pre[x] != 3)
+		pre[x]++;
+	if (!y && pre[x])
+		pre[x]--;
 }
 
 int main(){
-//	freopen("tak.data", "r", stdin);
+//	freopen("sample.data", "r", stdin);
 //	freopen("1.out", "w", stdout);
-	pre();
-	pc = 0;
-	for (int i = 0; i < 4; i++)
-		cur[i] = 0;
+	Pre();
+	int T(0);
+	pc = op = cnt = 0;
+	int x;
 	while (1){
-//	for (int i = 1; i <= 10000; i++){
+//	for (int i = 1; i <= 10; i++){
 //		if (pc == 4120)
 //			cerr << '!';
-		IF(cur[0], 0);
-		if (IFID[cur[0]].cur == 267388179)
-			break;
-		ID(cur[1]);
-		EX(cur[2]);
-		MEM(cur[3]);
-		WB(cur[4]);
+		ist = 0;
+		for (int i = 0; i < 5; i++)
+			cur[op ^ 1][i] = 0;
+		WB(cur[op][4]);
+		MEM(cur[op][3]);
+		EX(cur[op][2]);
+		ID(cur[op][1]);
+
+		if (!ist){
+			if (cur[op][1] && IDEX[cur[op][1]].op == 99){
+				x = (IDEX[cur[op][1]].npc - 4) >> 2;
+				bool p = (pre[x] > 1);
+			//	cerr << "!!!!!!" << pc << ' ' << p << endl;
+				if (p ^ (pc != IDEX[cur[op][1]].npc)){
+					work(x, 1);
+				}
+				else{
+					work(x, 0);
+					ist = 1;
+				}
+			}
+		}
+
+		if (!ist){
+			cnt++;
+			if (cnt > 5)
+				cnt -= 5;
+			IF(cur[op][0] = cnt);
+			if (IFID[cur[op][0]].cur == 267388179)
+				break;
+		}
+		
+		op ^= 1;
+		if (fl)
+			T += 3;
+		else
+			T++;
+	//	cerr << T << ' ' << pc << endl;
 	}
+//	cerr << (double)A/B << endl;
 	printf("%d\n", reg[10] & 255u);
 	return 0;
 }
