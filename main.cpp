@@ -7,7 +7,7 @@ typedef unsigned int uint;
 const int N = 34;
 const int M = 2e5;
 const int K = 10;
-int cur[2][5], op, ist, cnt(0), pre[4096];
+int cur[2][5], op, ist, cnt(0), pre[4096][4], g[4096];
 uint pc, mem[M], reg[N], tr[200];
 bool fl;
 int fr[N];
@@ -433,21 +433,7 @@ void MEM(int id){
 	fl = 0;
 	if (!id)
 		return;
-//	if (ist[op][3]){
-//		ist[op ^ 1][]
-//	}
 	switch (EXMEM[id].op){
-	case 0:
-		break;/*
-	case 111: case 103:
-		pc = EXMEM[id].ALUOutput;
-		break;
-
-	case 99:
-		if (EXMEM[id].con)
-			pc = EXMEM[id].ALUOutput;
-		break;
-*/
 	case 3:
 		switch (EXMEM[id].op_){
 			case 0: case 4:
@@ -472,7 +458,6 @@ void MEM(int id){
 		break;
 
 	case 35:
-	//	cout << "!!!" << EXMEM[id].ALUOutput << endl;
 		switch (EXMEM[id].op_){
 			case 0:
 				mem[EXMEM[id].ALUOutput] = get(EXMEM[id].rs2, 0, 7);
@@ -539,23 +524,21 @@ void WB(int id){
 void work(int x, bool y){
 	A += y;
 	B++;
-	if (y && pre[x] < 1)
-		pre[x]++;
-	if (!y && pre[x] > -2)
-		pre[x]--;
+	if ((y && pre[x][g[x]] == 0) || (!y && pre[x][g[x]] < 0))
+		pre[x][g[x]]++;
+	else
+		if ((y && pre[x][g[x]] == -1) || (!y && pre[x][g[x]] > -1))
+			pre[x][g[x]]--;
 }
 
 int main(){
-//	freopen("qsort.data", "r", stdin);
+//	freopen("hanoi.data", "r", stdin);
 //	freopen("1.out", "w", stdout);
 	Pre();
 	int T(0);
 	pc = op = cnt = 0;
 	int x, ise(0);
 	while (1){
-//	for (int i = 1; i <= 10; i++){
-//		if (pc == 4120)
-//			cerr << '!';
 		ist = ise;
 		for (int i = 0; i < 5; i++)
 			cur[op ^ 1][i] = 0;
@@ -569,12 +552,7 @@ int main(){
 		if (!ist){
 			if (cur[op][1] && IDEX[cur[op][1]].op == 99){
 				x = (IDEX[cur[op][1]].npc - 4) >> 2;
-				bool p = (pre[x] > -1);
-			//	if (x == 1103)
-			//		cerr << '!';
-			//	printf("%u %d %d\n", x, pre[x], p ^ (pc == IDEX[cur[op][1]].npc));
-			//	printf("%d %d %d\n", p, pc, IDEX[cur[op][1]].npc);
-			//	cerr << "!!!!!!" << pc << ' ' << p << endl;
+				bool p = (pre[x][g[x]] > -1);
 				if (p ^ (pc == IDEX[cur[op][1]].npc)){
 					work(x, 1);
 				}
@@ -582,6 +560,7 @@ int main(){
 					work(x, 0);
 					ist = 1;
 				}
+				g[x] = ((g[x] << 1) & 3) | (pc != IDEX[cur[op][1]].npc);
 			}
 		}
 
